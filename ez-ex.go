@@ -1,12 +1,10 @@
-package main
+package ezex
 
 import (
 	"database/sql"
 	_ "embed"
-	"errors"
 	"fmt"
 	_ "github.com/mattn/go-sqlite3"
-	"log"
 	"os"
 )
 
@@ -15,26 +13,15 @@ var dbInitScriptSQL string
 
 const dbName = "user-data.db"
 
-func main() {
+func OpenDB() (*sql.DB, error) {
 	home, _ := os.UserHomeDir()
 	_ = os.MkdirAll(home+"/.ez-ex", 0700)
-	_, err := os.Stat(dbName)
-	dbExists := !errors.Is(err, os.ErrNotExist)
 
 	dsName := fmt.Sprintf("file:%s/.ez-ex/%s?_foreign_keys=true", home, dbName)
-	db, err := sql.Open("sqlite3", dsName)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer func(db *sql.DB) {
-		if err := db.Close(); err != nil {
-			log.Fatal(err)
-		}
-	}(db)
+	return sql.Open("sqlite3", dsName)
+}
 
-	if !dbExists {
-		if _, err := db.Exec(dbInitScriptSQL); err != nil {
-			log.Fatal(err)
-		}
-	}
+func MigrateDB(db *sql.DB) error {
+	_, err := db.Exec(dbInitScriptSQL)
+	return err
 }
