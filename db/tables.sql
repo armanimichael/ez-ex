@@ -39,3 +39,5 @@ CREATE TABLE IF NOT EXISTS transactions
     FOREIGN KEY (payee_id) REFERENCES payees ON DELETE RESTRICT,
     FOREIGN KEY (account_id) REFERENCES accounts ON DELETE RESTRICT
 );
+
+CREATE INDEX IF NOT EXISTS ix_transactions_by_account_id_transaction_date_unix ON transactions (account_id, transaction_date_unix);
