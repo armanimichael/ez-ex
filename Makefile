@@ -4,6 +4,7 @@ FEATURES="sqlite_foreign_keys"
 build-cli:
 	go build -o ${NAME} -tags ${FEATURES} ./cmd/ez-ex-cli/
 run-cli:
+	clear
 	@go build -o ${NAME} -tags ${FEATURES} ./cmd/ez-ex-cli/
 	@${NAME}
 clean:
