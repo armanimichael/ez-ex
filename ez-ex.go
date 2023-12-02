@@ -6,16 +6,18 @@ import (
 	"fmt"
 	_ "github.com/mattn/go-sqlite3"
 	"os"
+	"path"
 )
 
 //go:embed db/tables.sql
 var dbInitScriptSQL string
 
 const dbName = "user-data.db"
+const UserDataDir = ".ez-ex"
 
 func OpenDB() (*sql.DB, error) {
 	home, _ := os.UserHomeDir()
-	_ = os.MkdirAll(home+"/.ez-ex", 0700)
+	_ = os.MkdirAll(path.Join(home, UserDataDir), 0700)
 
 	dsName := fmt.Sprintf("file:%s/.ez-ex/%s?_foreign_keys=true", home, dbName)
 	return sql.Open("sqlite3", dsName)
