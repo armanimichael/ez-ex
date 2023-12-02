@@ -8,6 +8,8 @@ Easy expenses tracker
 
 - Manage account
   - [ ] CLI
+    - Manage updates
+    - Manage delete if there's any active transaction on given account
   - [ ] Web
 - Manage payees
     - [ ] CLI

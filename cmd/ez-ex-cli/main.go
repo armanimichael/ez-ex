@@ -9,7 +9,13 @@ import (
 	"os"
 )
 
+var logger = NewFileLogger()
+
 func main() {
+	defer func(logger Logger) {
+		_ = logger.Close()
+	}(logger)
+
 	db, err := ezex.OpenDB()
 	if err != nil {
 		log.Fatalf("Error opening the DB: %s", err)

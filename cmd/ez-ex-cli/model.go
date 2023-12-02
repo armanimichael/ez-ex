@@ -7,27 +7,29 @@ import (
 
 const (
 	accountModelID = iota
+	transactionModelID
 	categoryModelID
 	payeeModelID
-	transactionModelID
 )
 
 type model struct {
-	currentModel int
-	accountModel accountModel
+	db             *sql.DB
+	currentModelID int
+	currentModel   tea.Model
 }
 
 func initialModel(db *sql.DB) model {
 	return model{
-		currentModel: accountModelID,
-		accountModel: initAccountModel(db),
+		db:             db,
+		currentModelID: accountModelID,
+		currentModel:   initAccountModel(db),
 	}
 }
 
 func (m model) Init() tea.Cmd {
-	switch m.currentModel {
+	switch m.currentModelID {
 	case accountModelID:
-		return m.accountModel.Init()
+		return m.currentModel.Init()
 	}
 
 	return nil
@@ -37,6 +39,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 
 	switch msg := msg.(type) {
+	case switchModelMsg:
+		m.currentModelID = msg
+	case accountModel:
+		m.currentModel = initAccountModel(m.db)
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "ctrl+c":
@@ -44,19 +50,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	}
 
-	switch m.currentModel {
+	switch m.currentModelID {
 	case accountModelID:
-		m.accountModel, cmd = m.accountModel.Update(msg)
+		m.currentModel, cmd = m.currentModel.Update(msg)
 	}
 
 	return m, cmd
 }
 
 func (m model) View() string {
-	switch m.currentModel {
-	case accountModelID:
-		return m.accountModel.View()
-	}
-
-	return ""
+	return m.currentModel.View()
 }
