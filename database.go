@@ -31,6 +31,10 @@ func dbUpdate(db *sql.DB, query string, args ...any) (int, error) {
 // dbDelete handles delete queries and returns the number of affected rows
 func dbDelete(db *sql.DB, query string, args ...any) int {
 	result, _ := db.Exec(query, args...)
+	if result == nil {
+		return 0
+	}
+
 	n, _ := result.RowsAffected()
 
 	return int(n)
