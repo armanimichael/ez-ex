@@ -21,6 +21,8 @@ Easy expenses tracker
     - [ ] CLI
     - [ ] Web
 - [ ] Scheduled operations (transactions)
+- [ ] Language selection
+- [ ] Currency selection
 
 ### Maybe
 
