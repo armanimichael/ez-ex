@@ -7,7 +7,6 @@ import (
 	"github.com/charmbracelet/bubbles/table"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 	"regexp"
 	"strconv"
 	"strings"
@@ -37,13 +36,19 @@ const (
 	accountNewInitialBalanceStage
 )
 
-var accountTableKeySuggestions = buildAccountTableKeySuggestions()
+var accountTableKeySuggestions = formatKeySuggestions([][]string{
+	{"^C", "quit"},
+	{"{enter}", "select account"},
+	{"d", "delete account"},
+	{"n", "create account"},
+})
 
 func initAccountModel(db *sql.DB) (m accountModel) {
 	m.db = db
 	m = m.createAccountsTable(ezex.GetAccounts(db))
 
 	if len(m.accounts) > 0 {
+		m.table.selectedID = m.accounts[0].ID
 		m.stage = accountSelectionStage
 	} else {
 		m.stage = accountNewNameStage
@@ -89,54 +94,17 @@ func (m accountModel) View() string {
 func (m accountModel) createAccountsTable(accounts []ezex.Account) accountModel {
 	m.newAccount = ezex.Account{}
 	m.accounts = accounts
-	t := table.New(
-		table.WithColumns(
-			[]table.Column{
-				{Title: "ID", Width: 10},
-				{Title: "Account name", Width: 20},
-				{Title: "Balance", Width: 10},
-				{Title: "Description", Width: 50},
-			}),
-		table.WithRows(accountsToTableRows(accounts...)),
-		table.WithFocused(true),
-		table.WithHeight(6),
+	m.table.model = createStandardTable(
+		[]table.Column{
+			{Title: "ID", Width: 5},
+			{Title: "Account name", Width: 20},
+			{Title: "Balance", Width: 10},
+			{Title: "Description", Width: 50},
+		},
+		accountsToTableRows(accounts...),
 	)
-	s := table.DefaultStyles()
-	s.Header = s.Header.
-		BorderStyle(lipgloss.NormalBorder()).
-		BorderForeground(foreground).
-		BorderBottom(true).
-		Bold(false)
-	s.Selected = s.Selected.
-		Foreground(selectedForeground).
-		Background(selectedBackground).
-		Bold(false)
-	t.SetStyles(s)
 
-	m.table.model = t
 	return m
-}
-
-func buildAccountTableKeySuggestions() string {
-	commands := [][]string{
-		{"^C", "quit"},
-		{"{enter}", "select account"},
-		{"d", "delete account"},
-		{"n", "create account"},
-	}
-
-	str := strings.Builder{}
-	for _, pair := range commands {
-		str.WriteString(
-			fmt.Sprintf(
-				"%s\t\t%s\n",
-				keySuggestionStyle.Render(pair[0]),
-				keySuggestionNoteStyle.Render(pair[1]),
-			),
-		)
-	}
-
-	return str.String()
 }
 
 func (m accountModel) validateInput() string {
@@ -150,7 +118,7 @@ func (m accountModel) validateInput() string {
 	switch m.stage {
 	case accountNewInitialBalanceStage:
 		// Strict balance format 0:00
-		re := regexp.MustCompile(`(?P<integer>\d+)(\.(?P<cents>\d{2}))+$`)
+		re := regexp.MustCompile(`^-?(?P<integer>\d+)(\.(?P<cents>\d{2}))+$`)
 		isValidBalance := re.MatchString(input)
 
 		if !isValidBalance {
@@ -180,8 +148,8 @@ func (m accountModel) handleAccountSelection(msg tea.Msg) (accountModel, tea.Cmd
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "enter":
-			logger.Debug("Switch to transaction model")
-			return m, switchModelCmd(transactionModelID)
+			logger.Debug(fmt.Sprintf("Select account ID %v", m.table.selectedID))
+			return m, switchModelCmd(transactionModelID, m.table.selectedID)
 		case "d":
 			var selectedID int
 			if len(m.accounts) == 1 {
@@ -275,6 +243,7 @@ func (m accountModel) handleAccountCreation(msg tea.Msg) (accountModel, tea.Cmd)
 		m.input.model.SetValue("")
 		m.accounts = append(m.accounts, m.newAccount)
 		m.table.model.SetRows(append(m.table.model.Rows(), accountsToTableRows(m.newAccount)[0]))
+		m.table.selectedID = m.accounts[0].ID
 		m.stage = accountSelectionStage
 	}
 
@@ -289,8 +258,6 @@ func accountsToTableRows(accounts ...ezex.Account) []table.Row {
 	var rows []table.Row
 
 	for _, account := range accounts {
-		balance := strconv.FormatFloat(float64(account.BalanceInCents)/100.0, 'f', 2, 64)
-
 		desc := account.Description.String
 		if !account.Description.Valid {
 			desc = "<NO DESCRIPTION>"
@@ -301,7 +268,7 @@ func accountsToTableRows(accounts ...ezex.Account) []table.Row {
 			table.Row{
 				strconv.Itoa(account.ID),
 				account.Name,
-				balance,
+				formatCents(account.BalanceInCents, true),
 				desc,
 			})
 	}
