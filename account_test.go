@@ -150,3 +150,37 @@ func TestGetAccounts(t *testing.T) {
 		balanceInCents:        account2.BalanceInCents,
 	})
 }
+
+func TestGetAccount(t *testing.T) {
+	name := "TestGetAccount"
+	description := "TestGetAccount"
+	initialBalance := int64(123)
+	balance := int64(1234)
+
+	account := Account{
+		Name: name,
+		Description: sql.NullString{
+			String: description,
+			Valid:  true,
+		},
+		InitialBalanceInCents: initialBalance,
+		BalanceInCents:        balance,
+	}
+
+	id, _ := AddAccount(testDB, account)
+
+	retrievedAccount, err := GetAccount(testDB, id)
+
+	assert.Nil(t, err)
+	assert.Equal(t, id, retrievedAccount.ID)
+	assert.Equal(t, name, retrievedAccount.Name)
+	assert.Equal(t, description, retrievedAccount.Description.String)
+	assert.Equal(t, balance, retrievedAccount.BalanceInCents)
+	assert.Equal(t, initialBalance, retrievedAccount.InitialBalanceInCents)
+}
+
+func TestGetAccount_NoMatch(t *testing.T) {
+	_, err := GetAccount(testDB, -1)
+
+	assert.Error(t, err)
+}

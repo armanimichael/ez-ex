@@ -1,6 +1,10 @@
 package ezex
 
-import "database/sql"
+import (
+	"database/sql"
+	"errors"
+	"fmt"
+)
 
 type Account struct {
 	ID                    int
@@ -49,5 +53,27 @@ func UpdateAccount(db *sql.DB, account Account) (int, error) {
 }
 
 func GetAccounts(db *sql.DB) []Account {
-	return dbGet[Account](db, `SELECT id, name, description, initial_balance_in_cents, balance_in_cents FROM accounts ORDER BY name DESC`)
+	return dbGet[Account](db, `SELECT id, name, description, initial_balance_in_cents, balance_in_cents FROM accounts ORDER BY id DESC`)
+}
+
+func GetAccount(db *sql.DB, id int) (Account, error) {
+	results := dbGet[Account](
+		db,
+		`
+		SELECT		id,
+					name,
+					description,
+					initial_balance_in_cents,
+					balance_in_cents
+		FROM		accounts
+		WHERE		id = $id
+		ORDER BY 	name DESC`,
+		id,
+	)
+
+	if len(results) == 0 {
+		return Account{}, errors.New(fmt.Sprintf("no accounts with id: %d", id))
+	}
+
+	return results[0], nil
 }
