@@ -10,12 +10,12 @@ import (
 
 type Logger interface {
 	io.Closer
-	Info(format string)
-	Warn(format string)
-	Err(format string)
-	Debug(format string)
-	Trace(format string)
-	Fatal(format string)
+	Info(msg string)
+	Warn(msg string)
+	Err(msg string)
+	Debug(msg string)
+	Trace(msg string)
+	Fatal(msg string)
 }
 
 type FileLogger struct {
@@ -44,33 +44,33 @@ func (f FileLogger) Close() error {
 	return f.file.Close()
 }
 
-func (f FileLogger) Info(format string) {
-	f.print("[INFO]", format, f.flag)
+func (f FileLogger) Info(msg string) {
+	f.print("[INFO]", msg, f.flag)
 }
 
-func (f FileLogger) Warn(format string) {
-	f.print("[WARNING]", format, f.flag)
+func (f FileLogger) Warn(msg string) {
+	f.print("[WARNING]", msg, f.flag)
 }
 
-func (f FileLogger) Err(format string) {
-	f.print("[ERROR]", format, f.flag)
+func (f FileLogger) Err(msg string) {
+	f.print("[ERROR]", msg, f.flag)
 }
 
-func (f FileLogger) Debug(format string) {
-	f.print("[DEBUG]", format, f.flag|log.Llongfile)
+func (f FileLogger) Debug(msg string) {
+	f.print("[DEBUG]", msg, f.flag|log.Llongfile)
 }
 
-func (f FileLogger) Trace(format string) {
-	f.print("[TRACE]", format, f.flag|log.Llongfile)
+func (f FileLogger) Trace(msg string) {
+	f.print("[TRACE]", msg, f.flag|log.Llongfile)
 }
 
-func (f FileLogger) Fatal(format string) {
-	f.print("[FATAL]", format, f.flag)
+func (f FileLogger) Fatal(msg string) {
+	f.print("[FATAL]", msg, f.flag)
 	os.Exit(1)
 }
 
-func (f FileLogger) print(prefix string, format string, flag int) {
+func (f FileLogger) print(prefix string, msg string, flag int) {
 	f.logger.SetFlags(flag)
 	f.logger.SetPrefix(prefix + " ")
-	f.logger.Println(format)
+	f.logger.Println(msg)
 }
