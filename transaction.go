@@ -114,6 +114,7 @@ func GetTransactions(db *sql.DB, accountID int, minDate time.Time, maxDate time.
 		WHERE			t.account_id = $accountID
 					AND	t.transaction_date_unix >= $minDateUnix
 					AND t.transaction_date_unix < $maxDateUnix
+					AND t.delete_date_unix IS NULL
 		ORDER BY	t.transaction_date_unix DESC
 		`,
 		accountID,

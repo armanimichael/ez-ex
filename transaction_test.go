@@ -120,10 +120,7 @@ func TestGetTransactions(t *testing.T) {
 			Int64: 6,
 			Valid: true,
 		},
-		DeleteDateUnix: sql.NullInt64{
-			Int64: 7,
-			Valid: true,
-		},
+		DeleteDateUnix: sql.NullInt64{},
 		Notes: sql.NullString{
 			String: "note",
 			Valid:  true,
@@ -139,10 +136,7 @@ func TestGetTransactions(t *testing.T) {
 			Int64: 6,
 			Valid: true,
 		},
-		DeleteDateUnix: sql.NullInt64{
-			Int64: 7,
-			Valid: true,
-		},
+		DeleteDateUnix: sql.NullInt64{},
 		Notes: sql.NullString{
 			String: "note",
 			Valid:  true,
@@ -168,11 +162,25 @@ func TestGetTransactions(t *testing.T) {
 		DeleteDateUnix:      sql.NullInt64{},
 		Notes:               sql.NullString{},
 	}
+	transactionDeleted := Transaction{
+		CategoryID:          0,
+		PayeeID:             payee2ID,
+		AccountID:           account2ID,
+		AmountInCents:       -4,
+		TransactionDateUnix: -5,
+		UpdateDateUnix:      sql.NullInt64{},
+		DeleteDateUnix: sql.NullInt64{
+			Int64: 1,
+			Valid: true,
+		},
+		Notes: sql.NullString{},
+	}
 
 	_, _ = AddTransaction(testDB, transaction1)
 	_, _ = AddTransaction(testDB, transaction2)
 	_, _ = AddTransaction(testDB, transaction3)
 	_, _ = AddTransaction(testDB, transaction4)
+	_, _ = AddTransaction(testDB, transactionDeleted)
 
 	transactions := GetTransactions(
 		testDB,
@@ -194,9 +202,9 @@ func TestGetTransactions(t *testing.T) {
 		payeeName           string
 		accountName         string
 	}
-	payeesWithoutID := make([]TransactionWithoutID, len(transactions))
+	transactionsWithoutID := make([]TransactionWithoutID, len(transactions))
 	for i, transaction := range transactions {
-		payeesWithoutID[i] = TransactionWithoutID{
+		transactionsWithoutID[i] = TransactionWithoutID{
 			categoryID:          transaction.CategoryID,
 			payeeID:             transaction.PayeeID,
 			accountID:           transaction.AccountID,
@@ -211,7 +219,7 @@ func TestGetTransactions(t *testing.T) {
 		}
 	}
 
-	assert.Contains(t, payeesWithoutID, TransactionWithoutID{
+	assert.Contains(t, transactionsWithoutID, TransactionWithoutID{
 		categoryID:          transaction1.CategoryID,
 		payeeID:             transaction1.PayeeID,
 		accountID:           transaction1.AccountID,
@@ -224,4 +232,5 @@ func TestGetTransactions(t *testing.T) {
 		payeeName:           "Payee1",
 		accountName:         "Account1",
 	})
+	assert.NotContains(t, transactionsWithoutID, transactionDeleted)
 }
