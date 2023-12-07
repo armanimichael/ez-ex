@@ -2,6 +2,7 @@ package main
 
 import (
 	"database/sql"
+	"errors"
 	ezex "github.com/armanimichael/ez-ex"
 	tea "github.com/charmbracelet/bubbletea"
 	"time"
@@ -18,7 +19,9 @@ type createNewAccountMsg = struct {
 }
 
 type deleteAccountMsg = struct {
-	deletedID int
+	deletedID    int
+	deletedIndex int
+	err          error
 }
 
 type switchTransactionsMonthMsg = struct {
@@ -39,11 +42,20 @@ func createNewAccountCmd(db *sql.DB, account ezex.Account) tea.Cmd {
 	}
 }
 
-func deleteAccountCmd(db *sql.DB, id int) tea.Cmd {
+func deleteAccountCmd(db *sql.DB, id int, index int) tea.Cmd {
 	return func() tea.Msg {
-		_ = ezex.DeleteAccount(db, id)
+		n := ezex.DeleteAccount(db, id)
 
-		return deleteAccountMsg{deletedID: id}
+		var err error
+		if n == 0 {
+			err = errors.New("cannot delete account with active transactions")
+		}
+
+		return deleteAccountMsg{
+			deletedID:    id,
+			deletedIndex: index,
+			err:          err,
+		}
 	}
 }
 

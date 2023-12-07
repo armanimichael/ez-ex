@@ -4,36 +4,27 @@ import (
 	"database/sql"
 	"fmt"
 	ezex "github.com/armanimichael/ez-ex"
+	"github.com/armanimichael/ez-ex/internal/slice"
 	"github.com/charmbracelet/bubbles/table"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
-	"regexp"
 	"strconv"
-	"strings"
 )
 
 type accountModel struct {
-	db         *sql.DB
-	stage      int
-	newAccount ezex.Account
-	accounts   []ezex.Account
-	table      struct {
+	db             *sql.DB
+	stage          int
+	accounts       []ezex.Account
+	accountCreator accountCreatorModel
+	table          struct {
 		model      table.Model
 		selectedID int
-	}
-	input struct {
-		model         textinput.Model
-		previousInput string
-		errorMsg      string
-		label         string
 	}
 }
 
 const (
 	accountSelectionStage = iota
-	accountNewNameStage
-	accountNewDescriptionStage
-	accountNewInitialBalanceStage
+	accountCreationStage
 )
 
 var accountTableKeySuggestions = formatKeySuggestions([][]string{
@@ -51,17 +42,10 @@ func initAccountModel(db *sql.DB) (m accountModel) {
 		m.table.selectedID = m.accounts[0].ID
 		m.stage = accountSelectionStage
 	} else {
-		m.stage = accountNewNameStage
+		m.stage = accountCreationStage
 	}
 
-	ti := textinput.New()
-	ti.Prompt = ""
-	ti.CharLimit = 100
-	ti.Placeholder = "Account name"
-	m.input.label = "Account name"
-	ti.Focus()
-
-	m.input.model = ti
+	m.accountCreator = initAccountCreatorModel(db, m.accounts)
 
 	return m
 }
@@ -71,12 +55,59 @@ func (m accountModel) Init() tea.Cmd {
 }
 
 func (m accountModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	switch m.stage {
-	case accountSelectionStage:
-		return m.handleAccountSelection(msg)
-	default:
-		return m.handleAccountCreation(msg)
+	var cmd tea.Cmd
+
+	switch msg := msg.(type) {
+	case deleteAccountMsg:
+		if msg.err != nil {
+			// TODO: handle
+			logger.Fatal(fmt.Sprintf("Error deleting account: %v", msg.err))
+			return m, tea.Quit
+		}
+
+		logger.Debug(fmt.Sprintf("Delete account (ID: %v)", m.table.selectedID))
+
+		// Remove deleted row from the table
+		updatedAccounts := make([]ezex.Account, 0, len(m.accounts)-1)
+		for _, account := range m.accounts {
+			if account.ID != msg.deletedID {
+				updatedAccounts = append(updatedAccounts, account)
+			}
+		}
+		m.accounts = updatedAccounts
+		m.accountCreator.reset(m.accounts)
+
+		if len(m.accounts) == 0 {
+			// No accounts left, go back to creation
+			m.stage = accountCreationStage
+		} else {
+			// Pre-select fist row
+			m.table.selectedID = m.accounts[0].ID
+			m.table.model.SetCursor(0)
+
+			m.table.model.SetRows(accountsToTableRows(m.accounts...))
+		}
+	case createNewAccountMsg:
+		if msg.err != nil {
+			logger.Fatal(fmt.Sprintf("Error creating account: %v", msg.err))
+			return m, tea.Quit
+		}
+
+		logger.Debug(fmt.Sprintf("Create new account: %v", msg.newAccount))
+		m.accounts = slice.Prepend(m.accounts, msg.newAccount, 10)
+		m.accountCreator.reset(m.accounts)
+		m.table.model.SetRows(accountsToTableRows(m.accounts...))
+		m.table.selectedID = msg.newAccount.ID
+		m.stage = accountSelectionStage
 	}
+
+	if m.stage == accountCreationStage {
+		m.accountCreator, cmd = m.accountCreator.Update(msg)
+
+		return m, cmd
+	}
+
+	return m.handleAccountSelectionCommands(msg)
 }
 
 func (m accountModel) View() string {
@@ -84,15 +115,10 @@ func (m accountModel) View() string {
 		return baseStyle.Render(m.table.model.View()) + "\n" + accountTableKeySuggestions + "\n"
 	}
 
-	if m.input.errorMsg != "" {
-		return m.input.label + ": " + m.input.model.View() + "\n" + errorMessageStyle.Render(m.input.errorMsg)
-	}
-
-	return m.input.label + ": " + m.input.model.View()
+	return m.accountCreator.View()
 }
 
 func (m accountModel) createAccountsTable(accounts []ezex.Account) accountModel {
-	m.newAccount = ezex.Account{}
 	m.accounts = accounts
 	m.table.model = createStandardTable(
 		[]table.Column{
@@ -107,40 +133,7 @@ func (m accountModel) createAccountsTable(accounts []ezex.Account) accountModel 
 	return m
 }
 
-func (m accountModel) validateInput() string {
-	input := m.input.model.Value()
-
-	// Avoid multiple checks for same inputs (because of update)
-	if input == m.input.previousInput && m.input.previousInput != "" {
-		return m.input.errorMsg
-	}
-
-	switch m.stage {
-	case accountNewInitialBalanceStage:
-		// Strict balance format 0:00
-		re := regexp.MustCompile(`^-?(?P<integer>\d+)(\.(?P<cents>\d{2}))+$`)
-		isValidBalance := re.MatchString(input)
-
-		if !isValidBalance {
-			return "invalid balance format, should look like `n.xx`"
-		}
-	case accountNewNameStage:
-		if input == "" {
-			return "account name must have at least 1 char"
-		}
-
-		// Don't allow duplicate account names
-		for _, account := range m.accounts {
-			if input == account.Name {
-				return fmt.Sprintf("there's already an account named: %v", input)
-			}
-		}
-	}
-
-	return ""
-}
-
-func (m accountModel) handleAccountSelection(msg tea.Msg) (accountModel, tea.Cmd) {
+func (m accountModel) handleAccountSelectionCommands(msg tea.Msg) (accountModel, tea.Cmd) {
 	var cmd tea.Cmd
 	m.table.model, cmd = m.table.model.Update(msg)
 
@@ -158,120 +151,17 @@ func (m accountModel) handleAccountSelection(msg tea.Msg) (accountModel, tea.Cmd
 				selectedID = m.table.selectedID
 			}
 
-			return m, tea.Batch(deleteAccountCmd(m.db, selectedID), cmd)
+			return m, tea.Batch(deleteAccountCmd(m.db, selectedID, m.table.model.Cursor()), cmd)
 		case "n":
-			m.input.model.Placeholder = "Account name"
-			m.input.label = "Account name"
-			m.stage = accountNewNameStage
-
-			return m, tea.Batch(m.input.model.Focus(), cmd)
+			m.stage = accountCreationStage
+			return m, textinput.Blink
 		case "down", "up":
 			r := m.table.model.SelectedRow()
 			selectedID, _ := strconv.ParseInt(r[0], 10, 32)
 			m.table.selectedID = int(selectedID)
 		}
-	case deleteAccountMsg:
-		logger.Debug(fmt.Sprintf("Delete account (ID: %v)", m.table.selectedID))
-		updatedAccounts := make([]ezex.Account, 0, len(m.accounts)-1)
 
-		for _, account := range m.accounts {
-			if account.ID != msg.deletedID {
-				updatedAccounts = append(updatedAccounts, account)
-			}
-		}
-
-		if len(updatedAccounts) == 0 {
-			m.input.model.Placeholder = "Account name"
-			m.input.label = "Account name"
-			m.stage = accountNewNameStage
-
-			return m.createAccountsTable(updatedAccounts), textinput.Blink
-		}
-
-		return m.createAccountsTable(updatedAccounts), cmd
 	}
 
 	return m, cmd
-}
-
-func (m accountModel) handleAccountCreation(msg tea.Msg) (accountModel, tea.Cmd) {
-	var cmd tea.Cmd
-
-	switch msg := msg.(type) {
-	case tea.KeyMsg:
-		switch msg.String() {
-		case "enter":
-			if m.input.errorMsg != "" {
-				break
-			}
-
-			value := m.input.model.Value()
-			m.input.model.SetValue("")
-
-			switch m.stage {
-			case accountNewNameStage:
-				m.newAccount.Name = value
-				m.input.label = "Account description (can be empty)"
-				m.input.model.Placeholder = ""
-				m.stage = accountNewDescriptionStage
-			case accountNewDescriptionStage:
-				m.newAccount.Description = sql.NullString{
-					String: value,
-					Valid:  len(value) > 0,
-				}
-				m.input.label = "Account balance"
-				m.input.model.Placeholder = "0.00"
-				m.stage = accountNewInitialBalanceStage
-				m.input.model.SetValue("0.00")
-			case accountNewInitialBalanceStage:
-				balanceInCentsStr := strings.Replace(value, ".", "", 1)
-				balanceInCents, _ := strconv.ParseInt(balanceInCentsStr, 10, 64)
-				m.newAccount.InitialBalanceInCents = balanceInCents
-				m.newAccount.BalanceInCents = balanceInCents
-
-				return m, createNewAccountCmd(m.db, m.newAccount)
-			}
-		}
-	case createNewAccountMsg:
-		if msg.err != nil {
-			logger.Fatal(fmt.Sprintf("Error creating account: %v", msg.err))
-			break
-		}
-
-		logger.Debug(fmt.Sprintf("Create new account: %v", msg.newAccount))
-		m.newAccount = msg.newAccount
-		m.input.model.SetValue("")
-		m.accounts = append(m.accounts, m.newAccount)
-		m.table.model.SetRows(append(m.table.model.Rows(), accountsToTableRows(m.newAccount)[0]))
-		m.table.selectedID = m.accounts[0].ID
-		m.stage = accountSelectionStage
-	}
-
-	m.input.errorMsg = m.validateInput()
-	m.input.previousInput = m.input.model.Value()
-	m.input.model, cmd = m.input.model.Update(msg)
-
-	return m, cmd
-}
-
-func accountsToTableRows(accounts ...ezex.Account) []table.Row {
-	var rows []table.Row
-
-	for _, account := range accounts {
-		desc := account.Description.String
-		if !account.Description.Valid {
-			desc = "<NO DESCRIPTION>"
-		}
-
-		rows = append(
-			rows,
-			table.Row{
-				strconv.Itoa(account.ID),
-				account.Name,
-				formatCents(account.BalanceInCents, true),
-				desc,
-			})
-	}
-
-	return rows
 }
