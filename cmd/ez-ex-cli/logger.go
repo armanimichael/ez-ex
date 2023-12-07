@@ -66,7 +66,6 @@ func (f FileLogger) Trace(msg string) {
 
 func (f FileLogger) Fatal(msg string) {
 	f.print("[FATAL]", msg, f.flag)
-	os.Exit(1)
 }
 
 func (f FileLogger) print(prefix string, msg string, flag int) {
