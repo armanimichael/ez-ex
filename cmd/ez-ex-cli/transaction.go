@@ -7,7 +7,6 @@ import (
 	"github.com/charmbracelet/bubbles/table"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
-	"strconv"
 	"strings"
 	"time"
 )
@@ -42,7 +41,7 @@ var transactionTableKeySuggestions = formatKeySuggestions([][]string{
 	{"n", "create transaction"},
 })
 
-func initTransactionModel(db *sql.DB, accountID int) (m transactionModel) {
+func initTransactionModel(db *sql.DB, accountID int) (m transactionModel, err error) {
 	m.db = db
 	now := time.Now()
 	monthStart := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.Local)
@@ -51,13 +50,12 @@ func initTransactionModel(db *sql.DB, accountID int) (m transactionModel) {
 	m.table.selectedYear = monthStart.Year()
 	m = m.createTransactionsTable(ezex.GetTransactions(db, accountID, monthStart, monthEnd))
 
-	var err error
 	m.account, err = ezex.GetAccount(db, accountID)
 	if err != nil {
 		logger.Fatal(fmt.Sprintf("Cannot get account ID = %d: %v", accountID, err))
 	}
 
-	return m
+	return m, err
 }
 
 func (m transactionModel) Init() tea.Cmd {
@@ -124,30 +122,4 @@ func (m transactionModel) createTransactionsTable(transactions []ezex.Transactio
 		transactionsToTableRows(transactions...),
 	)
 	return m
-}
-
-func transactionsToTableRows(transactions ...ezex.TransactionView) []table.Row {
-	var rows []table.Row
-
-	for _, transaction := range transactions {
-		date := formatUnixDate(transaction.TransactionDateUnix)
-
-		notes := transaction.Notes.String
-		if !transaction.Notes.Valid {
-			notes = "<NO NOTES>"
-		}
-
-		rows = append(
-			rows,
-			table.Row{
-				strconv.Itoa(transaction.ID),
-				date,
-				formatCents(transaction.AmountInCents, true),
-				transaction.PayeeName,
-				transaction.CategoryName,
-				notes,
-			})
-	}
-
-	return rows
 }

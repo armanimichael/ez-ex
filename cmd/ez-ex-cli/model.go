@@ -54,7 +54,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case accountModelID:
 				m.currentModel = initAccountModel(m.db)
 			case transactionModelID:
-				m.currentModel = initTransactionModel(m.db, m.accountID)
+				var err error
+				m.currentModel, err = initTransactionModel(m.db, m.accountID)
+				if err != nil {
+					return m, tea.Quit
+				}
 			}
 
 			return m, cmd
