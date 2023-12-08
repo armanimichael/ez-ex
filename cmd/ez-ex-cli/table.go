@@ -43,7 +43,7 @@ func accountsToTableRows(accounts ...ezex.Account) []table.Row {
 			table.Row{
 				strconv.Itoa(account.ID),
 				account.Name,
-				formatCents(account.BalanceInCents, true),
+				encodeCents(account.BalanceInCents, true),
 				desc,
 			})
 	}
@@ -55,7 +55,7 @@ func transactionsToTableRows(transactions ...ezex.TransactionView) []table.Row {
 	var rows []table.Row
 
 	for _, transaction := range transactions {
-		date := formatUnixDate(transaction.TransactionDateUnix)
+		date := encodeUnixDate(transaction.TransactionDateUnix)
 
 		notes := transaction.Notes.String
 		if !transaction.Notes.Valid {
@@ -67,7 +67,7 @@ func transactionsToTableRows(transactions ...ezex.TransactionView) []table.Row {
 			table.Row{
 				strconv.Itoa(transaction.ID),
 				date,
-				formatCents(transaction.AmountInCents, true),
+				encodeCents(transaction.AmountInCents, true),
 				transaction.PayeeName,
 				transaction.CategoryName,
 				notes,
