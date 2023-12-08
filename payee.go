@@ -44,5 +44,5 @@ func UpdatePayee(db *sql.DB, payee Payee) (int, error) {
 }
 
 func GetPayees(db *sql.DB) []Payee {
-	return dbGet[Payee](db, `SELECT id, name, description FROM payees ORDER BY name DESC`)
+	return dbGet[Payee](db, `SELECT id, name, description FROM payees ORDER BY id DESC`)
 }

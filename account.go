@@ -67,7 +67,7 @@ func GetAccount(db *sql.DB, id int) (Account, error) {
 					balance_in_cents
 		FROM		accounts
 		WHERE		id = $id
-		ORDER BY 	name DESC`,
+		ORDER BY 	id DESC`,
 		id,
 	)
 

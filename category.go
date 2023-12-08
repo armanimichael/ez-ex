@@ -50,6 +50,6 @@ func UpdateCategory(db *sql.DB, category Category) (int, error) {
 func GetCategories(db *sql.DB) []Category {
 	return dbGet[Category](
 		db,
-		`SELECT id, name, description FROM categories ORDER BY name DESC`,
+		`SELECT id, name, description FROM categories ORDER BY id DESC`,
 	)
 }
