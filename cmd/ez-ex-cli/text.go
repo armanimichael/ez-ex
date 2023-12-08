@@ -9,7 +9,7 @@ func autocomplete[T interface{ GetName() string }](entities []T, val string) (ma
 	for _, entity := range entities {
 		c := strings.ToLower(entity.GetName())
 
-		if c != v && strings.HasPrefix(c, v) {
+		if strings.HasPrefix(c, v) {
 			return &entity, true
 		}
 	}

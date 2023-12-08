@@ -52,6 +52,19 @@ func UpdateAccount(db *sql.DB, account Account) (int, error) {
 	)
 }
 
+func UpdateAccountBalance(db *sql.DB, accountID int, amountInCents int64) (int, error) {
+	return dbUpdate(
+		db,
+		`
+		UPDATE	accounts
+		SET		balance_in_cents = balance_in_cents - $amount_in_cents
+		WHERE	id = $id
+		`,
+		accountID,
+		amountInCents,
+	)
+}
+
 func GetAccounts(db *sql.DB) []Account {
 	return dbGet[Account](db, `SELECT id, name, description, initial_balance_in_cents, balance_in_cents FROM accounts ORDER BY id DESC`)
 }

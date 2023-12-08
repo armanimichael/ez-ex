@@ -7,16 +7,19 @@ import (
 	"github.com/charmbracelet/bubbles/table"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
+	"strconv"
 	"strings"
 	"time"
 )
 
 type transactionModel struct {
-	db             *sql.DB
-	newTransaction ezex.Transaction
-	account        ezex.Account
-	transactions   []ezex.TransactionView
-	table          struct {
+	db                 *sql.DB
+	newTransaction     ezex.Transaction
+	account            ezex.Account
+	transactions       []ezex.TransactionView
+	stage              int
+	transactionCreator transactionCreatorModel
+	table              struct {
 		model         table.Model
 		selectedID    int
 		selectedMonth time.Month
@@ -29,6 +32,11 @@ type transactionModel struct {
 		label         string
 	}
 }
+
+const (
+	transactionSelectionStage = iota
+	transactionCreationStage
+)
 
 var transactionTableKeySuggestions = formatKeySuggestions([][]string{
 	{"^C", "quit"},
@@ -43,12 +51,17 @@ var transactionTableKeySuggestions = formatKeySuggestions([][]string{
 
 func initTransactionModel(db *sql.DB, accountID int) (m transactionModel, err error) {
 	m.db = db
+	m.stage = transactionSelectionStage
+	m.transactionCreator = initTransactionCreator(db, accountID, ezex.GetPayees(db), ezex.GetCategories(db))
 	now := time.Now()
 	monthStart := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.Local)
 	monthEnd := time.Date(now.Year(), now.Month()+1, 1, 0, 0, 0, 0, time.Local)
 	m.table.selectedMonth = monthStart.Month()
 	m.table.selectedYear = monthStart.Year()
 	m = m.createTransactionsTable(ezex.GetTransactions(db, accountID, monthStart, monthEnd))
+	if len(m.transactions) > 0 {
+		m.table.selectedID = m.transactions[0].ID
+	}
 
 	m.account, err = ezex.GetAccount(db, accountID)
 	if err != nil {
@@ -64,7 +77,66 @@ func (m transactionModel) Init() tea.Cmd {
 
 func (m transactionModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
-	m.table.model, cmd = m.table.model.Update(msg)
+
+	switch msg := msg.(type) {
+	case switchTransactionsMonthMsg:
+		month := msg.month
+		year := msg.year
+		transactions := msg.transactions
+
+		m.table.selectedMonth = month
+		m.table.selectedYear = year
+
+		return m.createTransactionsTable(transactions), cmd
+	case createNewTransactionMsg:
+		if msg.err != nil {
+			// TODO: handle
+			logger.Fatal(fmt.Sprintf("Error creating new transaction: %v", msg.err))
+			return m, tea.Quit
+		}
+
+		m.transactionCreator = m.transactionCreator.reset()
+		m.transactions = msg.transactions
+		m.account.BalanceInCents += msg.amountInCents
+		m.table.model.SetRows(transactionsToTableRows(msg.transactions...))
+		m.stage = transactionSelectionStage
+		m.table.selectedID = msg.transactions[0].ID
+		m.table.model.SetCursor(0)
+	case deleteTransactionMsg:
+		if msg.err != nil {
+			// TODO: handle
+			logger.Fatal(fmt.Sprintf("Error deleting transaction: %v", msg.err))
+			return m, tea.Quit
+		}
+
+		// Remove deleted row from the table
+		updatedTransactions := make([]ezex.TransactionView, 0, len(m.transactions)-1)
+		for _, transaction := range m.transactions {
+			if transaction.ID != msg.deletedID {
+				updatedTransactions = append(updatedTransactions, transaction)
+			} else {
+				m.account.BalanceInCents -= transaction.AmountInCents
+			}
+		}
+		m.transactions = updatedTransactions
+
+		if len(m.transactions) != 0 {
+			// Pre-select fist row
+			m.table.selectedID = m.transactions[0].ID
+			m.table.model.SetCursor(0)
+			m.table.model.SetRows(transactionsToTableRows(m.transactions...))
+		} else {
+			m.table.model.SetRows([]table.Row{})
+		}
+		m.table.model.GotoTop()
+	}
+
+	if m.stage == transactionCreationStage {
+		m.transactionCreator, cmd = m.transactionCreator.Update(msg)
+		return m, cmd
+	} else {
+		m.table.model, cmd = m.table.model.Update(msg)
+	}
 
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
@@ -78,27 +150,45 @@ func (m transactionModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Batch(cmd, switchTransactionsMonthCmd(m.db, m.account.ID, m.table.selectedYear, m.table.selectedMonth-1))
 		case "r":
 			return m, tea.Batch(cmd, switchTransactionsMonthCmd(m.db, m.account.ID, time.Now().Year(), time.Now().Month()))
-		}
-	case switchTransactionsMonthMsg:
-		month := msg.month
-		year := msg.year
-		transactions := msg.transactions
+		case "d":
+			if len(m.transactions) == 0 {
+				break
+			}
 
-		m.table.selectedMonth = month
-		m.table.selectedYear = year
-		return m.createTransactionsTable(transactions), cmd
+			var selectedID int
+			if len(m.transactions) == 1 {
+				selectedID = m.transactions[0].ID
+			} else {
+				selectedID = m.table.selectedID
+			}
+
+			return m, tea.Batch(deleteTransactionCmd(m.db, selectedID, m.table.model.Cursor()), cmd)
+		case "n":
+			m.stage = transactionCreationStage
+			return m, textinput.Blink
+		case "down", "up":
+			r := m.table.model.SelectedRow()
+			if r != nil {
+				selectedID, _ := strconv.ParseInt(r[0], 10, 32)
+				m.table.selectedID = int(selectedID)
+			}
+		}
 	}
 
 	return m, cmd
 }
 
 func (m transactionModel) View() string {
+	if m.stage == transactionCreationStage {
+		return m.transactionCreator.View()
+	}
+
 	str := strings.Builder{}
 	str.WriteString(fmt.Sprintf("Account:\t(ID: %d) %s\n", m.account.ID, m.account.Name))
 	if m.account.Description.Valid {
 		str.WriteString(fmt.Sprintf("Description:\t%s\n", m.account.Description.String))
 	}
-	str.WriteString(fmt.Sprintf("Balance:\t%s\n\n", formatCents(m.account.BalanceInCents, false)))
+	str.WriteString(fmt.Sprintf("Balance:\t%s\n\n", encodeCents(m.account.BalanceInCents, false)))
 	str.WriteString(fmt.Sprintf("Month:\t\t%s %d\n", m.table.selectedMonth.String(), m.table.selectedYear))
 	str.WriteString(fmt.Sprintf("Count:\t\t%d\n", len(m.transactions)))
 	str.WriteString(baseStyle.Render(m.table.model.View()) + "\n")

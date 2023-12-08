@@ -31,9 +31,16 @@ type switchTransactionsMonthMsg = struct {
 }
 
 type createNewTransactionMsg = struct {
-	transactions []ezex.TransactionView
-	newPayee     ezex.Payee
-	newCategory  ezex.Category
+	transactions  []ezex.TransactionView
+	newPayee      ezex.Payee
+	newCategory   ezex.Category
+	amountInCents int64
+	err           error
+}
+
+type deleteTransactionMsg = struct {
+	deletedID    int
+	deletedIndex int
 	err          error
 }
 
@@ -71,6 +78,9 @@ func createNewTransactionCmd(db *sql.DB, transaction ezex.Transaction, payee eze
 		if _, err := ezex.AddTransaction(db, transaction); err != nil {
 			return createNewTransactionMsg{err: err}
 		}
+		if _, err := ezex.UpdateAccountBalance(db, transaction.AccountID, transaction.AmountInCents); err != nil {
+			return createNewTransactionMsg{err: err}
+		}
 
 		now := time.Now()
 		monthStart := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.Local)
@@ -78,10 +88,11 @@ func createNewTransactionCmd(db *sql.DB, transaction ezex.Transaction, payee eze
 		transactions := ezex.GetTransactions(db, transaction.AccountID, monthStart, monthEnd)
 
 		return createNewTransactionMsg{
-			transactions: transactions,
-			newPayee:     payee,
-			newCategory:  category,
-			err:          nil,
+			transactions:  transactions,
+			newPayee:      payee,
+			newCategory:   category,
+			amountInCents: transaction.AmountInCents,
+			err:           nil,
 		}
 	}
 }
@@ -96,6 +107,21 @@ func deleteAccountCmd(db *sql.DB, id int, index int) tea.Cmd {
 		}
 
 		return deleteAccountMsg{
+			deletedID:    id,
+			deletedIndex: index,
+			err:          err,
+		}
+	}
+}
+
+func deleteTransactionCmd(db *sql.DB, id int, index int) tea.Cmd {
+	return func() tea.Msg {
+		_, err := ezex.DeleteTransaction(db, id)
+		if err != nil {
+			return deleteTransactionMsg{err: err}
+		}
+
+		return deleteTransactionMsg{
 			deletedID:    id,
 			deletedIndex: index,
 			err:          err,

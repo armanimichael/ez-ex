@@ -99,6 +99,20 @@ func TestUpdateAccount_Unique(t *testing.T) {
 	assert.Error(t, err)
 }
 
+func TestUpdateAccountBalance(t *testing.T) {
+	id, _ := AddAccount(testDB, Account{
+		Name:                  "TestUpdateAccountBalance",
+		Description:           sql.NullString{},
+		InitialBalanceInCents: 0,
+		BalanceInCents:        0,
+	})
+
+	n, err := UpdateAccountBalance(testDB, id, -100)
+
+	assert.Equal(t, 0, n)
+	assert.Nil(t, err)
+}
+
 func TestGetAccounts(t *testing.T) {
 	account1 := Account{
 		Name: "TestGetAccounts1",
