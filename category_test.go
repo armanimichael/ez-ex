@@ -144,3 +144,8 @@ func TestGetCategories(t *testing.T) {
 		description: cat2.Description,
 	})
 }
+
+func TestCategory_GetName(t *testing.T) {
+	cat := Category{Name: "TestCategory_GetName"}
+	assert.Equal(t, "TestCategory_GetName", cat.GetName())
+}

@@ -10,6 +10,10 @@ type Payee struct {
 	Description sql.NullString
 }
 
+func (p Payee) GetName() string {
+	return p.Name
+}
+
 func AddPayee(db *sql.DB, payee Payee) (int, error) {
 	return dbAdd(
 		db,

@@ -8,6 +8,10 @@ type Category struct {
 	Description sql.NullString
 }
 
+func (c Category) GetName() string {
+	return c.Name
+}
+
 // AddCategory creates a new category and returns the new category ID if successful
 func AddCategory(db *sql.DB, category Category) (int, error) {
 	return dbAdd(db, `INSERT INTO categories (name, description) VALUES ($name, $description)`, category.Name, category.Description)

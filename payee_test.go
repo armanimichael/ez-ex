@@ -121,3 +121,8 @@ func TestGetPayees(t *testing.T) {
 		description: payee2.Description,
 	})
 }
+
+func TestPayee_GetName(t *testing.T) {
+	payee := Payee{Name: "TestPayee_GetName"}
+	assert.Equal(t, "TestPayee_GetName", payee.GetName())
+}
