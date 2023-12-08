@@ -30,6 +30,13 @@ type switchTransactionsMonthMsg = struct {
 	transactions []ezex.TransactionView
 }
 
+type createNewTransactionMsg = struct {
+	transactions []ezex.TransactionView
+	newPayee     ezex.Payee
+	newCategory  ezex.Category
+	err          error
+}
+
 func createNewAccountCmd(db *sql.DB, account ezex.Account) tea.Cmd {
 	return func() tea.Msg {
 		id, err := ezex.AddAccount(db, account)
@@ -38,6 +45,43 @@ func createNewAccountCmd(db *sql.DB, account ezex.Account) tea.Cmd {
 		return createNewAccountMsg{
 			newAccount: account,
 			err:        err,
+		}
+	}
+}
+
+func createNewTransactionCmd(db *sql.DB, transaction ezex.Transaction, payee ezex.Payee, category ezex.Category) tea.Cmd {
+	return func() tea.Msg {
+		if payee.ID == 0 {
+			id, err := ezex.AddPayee(db, payee)
+			if err != nil {
+				return createNewTransactionMsg{err: err}
+			}
+			payee.ID = id
+			transaction.PayeeID = id
+		}
+		if category.ID == 0 && category.Name != "" {
+			id, err := ezex.AddCategory(db, category)
+			if err != nil {
+				return createNewTransactionMsg{err: err}
+			}
+			category.ID = id
+			transaction.CategoryID = id
+		}
+
+		if _, err := ezex.AddTransaction(db, transaction); err != nil {
+			return createNewTransactionMsg{err: err}
+		}
+
+		now := time.Now()
+		monthStart := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.Local)
+		monthEnd := time.Date(now.Year(), now.Month()+1, 1, 0, 0, 0, 0, time.Local)
+		transactions := ezex.GetTransactions(db, transaction.AccountID, monthStart, monthEnd)
+
+		return createNewTransactionMsg{
+			transactions: transactions,
+			newPayee:     payee,
+			newCategory:  category,
+			err:          nil,
 		}
 	}
 }
