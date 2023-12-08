@@ -6,7 +6,6 @@ import (
 	ezex "github.com/armanimichael/ez-ex"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
-	"regexp"
 	"strconv"
 	"strings"
 )
@@ -121,11 +120,10 @@ func (m accountCreatorModel) validateInput() string {
 	switch m.stage {
 	case accountNewInitialBalanceStage:
 		// Strict balance format 0:00
-		re := regexp.MustCompile(`^-?(?P<integer>\d+)(\.(?P<cents>\d{2}))+$`)
-		isValidBalance := re.MatchString(input)
+		isValidBalance := moneyFormatRegex.MatchString(input)
 
 		if !isValidBalance {
-			return "invalid balance format, should look like `n.xx`"
+			return "invalid balance format, should look like `0.00` or `-0.00`"
 		}
 	case accountNewNameStage:
 		if input == "" {
