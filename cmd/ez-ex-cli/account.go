@@ -13,6 +13,7 @@ import (
 
 type accountModel struct {
 	db             *sql.DB
+	errorMessage   string
 	stage          int
 	accounts       []ezex.Account
 	accountCreator accountCreatorModel
@@ -58,11 +59,16 @@ func (m accountModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 
 	switch msg := msg.(type) {
+	case hideErrorMessageMsg:
+		if msg.message == m.errorMessage {
+			m.errorMessage = ""
+		}
 	case deleteAccountMsg:
 		if msg.err != nil {
-			// TODO: handle
 			logger.Fatal(fmt.Sprintf("Error deleting account: %v", msg.err))
-			return m, tea.Quit
+			m.errorMessage = msg.err.Error()
+
+			return m, hideErrorMessageCmd(m.errorMessage)
 		}
 
 		logger.Debug(fmt.Sprintf("Delete account (ID: %v)", m.table.selectedID))
@@ -114,7 +120,12 @@ func (m accountModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m accountModel) View() string {
 	if m.stage == accountSelectionStage {
-		return baseStyle.Render(m.table.model.View()) + "\n" + accountTableKeySuggestions + "\n"
+		msg := ""
+		if m.errorMessage != "" {
+			msg = errorMessageStyle.Render("Error: "+m.errorMessage) + "\n"
+		}
+
+		return baseStyle.Render(m.table.model.View()) + "\n" + accountTableKeySuggestions + "\n" + msg
 	}
 
 	return m.accountCreator.View()
@@ -160,6 +171,7 @@ func (m accountModel) handleAccountSelectionCommands(msg tea.Msg) (accountModel,
 		case "down", "up":
 			r := m.table.model.SelectedRow()
 			selectedID, _ := strconv.ParseInt(r[0], 10, 32)
+			m.errorMessage = ""
 			m.table.selectedID = int(selectedID)
 		}
 

@@ -14,6 +14,7 @@ import (
 
 type transactionModel struct {
 	db                 *sql.DB
+	errorMessage       string
 	newTransaction     ezex.Transaction
 	account            ezex.Account
 	transactions       []ezex.TransactionView
@@ -79,6 +80,10 @@ func (m transactionModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 
 	switch msg := msg.(type) {
+	case hideErrorMessageMsg:
+		if msg.message == m.errorMessage {
+			m.errorMessage = ""
+		}
 	case switchTransactionsMonthMsg:
 		month := msg.month
 		year := msg.year
@@ -90,9 +95,10 @@ func (m transactionModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.createTransactionsTable(transactions), cmd
 	case createNewTransactionMsg:
 		if msg.err != nil {
-			// TODO: handle
 			logger.Fatal(fmt.Sprintf("Error creating new transaction: %v", msg.err))
-			return m, tea.Quit
+			m.errorMessage = msg.err.Error()
+
+			return m, hideErrorMessageCmd(m.errorMessage)
 		}
 
 		m.transactionCreator = m.transactionCreator.reset()
@@ -104,9 +110,10 @@ func (m transactionModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.table.model.SetCursor(0)
 	case deleteTransactionMsg:
 		if msg.err != nil {
-			// TODO: handle
 			logger.Fatal(fmt.Sprintf("Error deleting transaction: %v", msg.err))
-			return m, tea.Quit
+			m.errorMessage = msg.err.Error()
+
+			return m, hideErrorMessageCmd(m.errorMessage)
 		}
 
 		// Remove deleted row from the table
@@ -193,6 +200,10 @@ func (m transactionModel) View() string {
 	str.WriteString(fmt.Sprintf("Count:\t\t%d\n", len(m.transactions)))
 	str.WriteString(baseStyle.Render(m.table.model.View()) + "\n")
 	str.WriteString(transactionTableKeySuggestions)
+
+	if m.errorMessage != "" {
+		str.WriteString(errorMessageStyle.Render("Error: "+m.errorMessage) + "\n")
+	}
 
 	return str.String()
 }

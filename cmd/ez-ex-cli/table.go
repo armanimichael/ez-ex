@@ -2,6 +2,7 @@ package main
 
 import (
 	ezex "github.com/armanimichael/ez-ex"
+	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/table"
 	"github.com/charmbracelet/lipgloss"
 	"strconv"
@@ -13,6 +14,10 @@ func createStandardTable(columns []table.Column, rows []table.Row) table.Model {
 		table.WithRows(rows),
 		table.WithFocused(true),
 		table.WithHeight(6),
+		table.WithKeyMap(table.KeyMap{
+			LineUp:   key.NewBinding(key.WithKeys("up")),
+			LineDown: key.NewBinding(key.WithKeys("down")),
+		}),
 	)
 	s := table.DefaultStyles()
 	s.Header = s.Header.

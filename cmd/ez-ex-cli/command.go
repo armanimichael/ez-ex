@@ -44,6 +44,10 @@ type deleteTransactionMsg = struct {
 	err          error
 }
 
+type hideErrorMessageMsg = struct {
+	message string
+}
+
 func createNewAccountCmd(db *sql.DB, account ezex.Account) tea.Cmd {
 	return func() tea.Msg {
 		id, err := ezex.AddAccount(db, account)
@@ -148,6 +152,16 @@ func switchTransactionsMonthCmd(db *sql.DB, accountID int, year int, month time.
 			month:        monthStart.Month(),
 			year:         monthStart.Year(),
 			transactions: transactions,
+		}
+	}
+}
+
+func hideErrorMessageCmd(message string) tea.Cmd {
+	return func() tea.Msg {
+		time.Sleep(4 * time.Second)
+
+		return hideErrorMessageMsg{
+			message: message,
 		}
 	}
 }
