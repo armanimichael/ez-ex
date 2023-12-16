@@ -87,6 +87,7 @@ func (m accountModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 			m.table.model.SetRows(accountsToTableRows(m.accounts...))
 		}
+		m.table.model.GotoTop()
 	case createNewAccountMsg:
 		if msg.err != nil {
 			logger.Fatal(fmt.Sprintf("Error creating account: %v", msg.err))
@@ -99,6 +100,7 @@ func (m accountModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.table.model.SetRows(accountsToTableRows(m.accounts...))
 		m.table.selectedID = msg.newAccount.ID
 		m.stage = accountSelectionStage
+		m.table.model.GotoTop()
 	}
 
 	if m.stage == accountCreationStage {
