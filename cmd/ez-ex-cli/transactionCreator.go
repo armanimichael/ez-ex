@@ -6,7 +6,6 @@ import (
 	ezex "github.com/armanimichael/ez-ex"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
-	"strings"
 	"time"
 )
 
@@ -67,15 +66,7 @@ func (m transactionCreatorModel) Update(msg tea.Msg) (transactionCreatorModel, t
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "enter":
-			isValid := true
-			for _, input := range m.inputs {
-				if input.errorMsg != "" {
-					// Errors, cannot submit
-					isValid = false
-					break
-				}
-			}
-			if !isValid {
+			if !areStandardTextInputsValid(m.inputs) {
 				break
 			}
 
@@ -123,12 +114,12 @@ func (m transactionCreatorModel) Update(msg tea.Msg) (transactionCreatorModel, t
 		}
 	}
 
-	currentInput := &m.inputs[m.stage]
 	for i := range m.inputs {
 		errMsg := m.validateInput(i)
 		m.inputs[i].previousInput = m.inputs[i].model.Value()
 		m.inputs[i].errorMsg = errMsg
 	}
+	currentInput := &m.inputs[m.stage]
 	currentInput.model, cmd = currentInput.model.Update(msg)
 
 	// No value = no autosuggestion
@@ -182,70 +173,17 @@ func (m transactionCreatorModel) Update(msg tea.Msg) (transactionCreatorModel, t
 	return m, cmd
 }
 
+func (m transactionCreatorModel) View() string {
+	return standardTextInputView(m.stage, m.inputs, m.suggestion.autocompleteSuggestion)
+}
+
 func (m transactionCreatorModel) switchTransaction(msg fmt.Stringer) (transactionCreatorModel, tea.Cmd) {
 	m.inputs[m.stage].model.Blur()
-
-	if msg.String() == "up" {
-		if m.stage > transactionDateStage {
-			m.stage--
-		} else {
-			m.stage = transactionNoteStage
-		}
-	} else {
-		if m.stage < transactionNoteStage {
-			m.stage++
-		} else {
-			m.stage = transactionDateStage
-		}
-	}
-
+	m.stage = handleSwitchInputStage(msg.String() == "up", m.stage, transactionDateStage, transactionNoteStage)
 	m.inputs[m.stage].model.SetCursor(0)
 	m.inputs[m.stage].model.Focus()
 
 	return m, textinput.Blink
-}
-
-func (m transactionCreatorModel) View() string {
-	lastIndex := len(m.inputs) - 1
-	inputListStr := strings.Builder{}
-	errorsListStr := strings.Builder{}
-
-	for i, input := range m.inputs {
-		var render func(s ...string) string
-		if i == m.stage {
-			render = inputBoxSelectedStyle.Render
-		} else {
-			render = inputBoxStyle.Render
-		}
-
-		var mark string
-		if input.errorMsg == "" {
-			mark = successMessageStyle.Render("🗸\t")
-		} else {
-			mark = errorMessageStyle.Render("🞪\t")
-		}
-		label := mark + fmt.Sprintf("%-19s", input.label+": ")
-
-		inputListStr.WriteString(render(label) + input.model.View())
-
-		if i == m.stage && input.model.Value() != "" {
-			inputListStr.WriteString(lowOpacityForegroundStyle.Render(m.suggestion.autocompleteSuggestion))
-		}
-
-		if errMsg := input.errorMsg; errMsg != "" {
-			errorsListStr.WriteString(errorMessageStyle.Render("- "+errMsg) + "\n")
-		}
-
-		if i != lastIndex {
-			inputListStr.WriteString("\n")
-		}
-	}
-
-	if errorsListStr.Len() > 0 {
-		return inputListStr.String() + "\n\n" + errorsListStr.String()
-	} else {
-		return inputListStr.String()
-	}
 }
 
 func (m transactionCreatorModel) validateInput(stage int) string {

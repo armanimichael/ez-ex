@@ -6,7 +6,6 @@ import (
 	ezex "github.com/armanimichael/ez-ex"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
-	"strings"
 )
 
 type accountCreatorModel struct {
@@ -44,15 +43,7 @@ func (m accountCreatorModel) Update(msg tea.Msg) (accountCreatorModel, tea.Cmd) 
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "enter":
-			isValid := true
-			for _, input := range m.inputs {
-				if input.errorMsg != "" {
-					// Errors, cannot submit
-					isValid = false
-					break
-				}
-			}
-			if !isValid {
+			if !areStandardTextInputsValid(m.inputs) {
 				break
 			}
 
@@ -73,73 +64,24 @@ func (m accountCreatorModel) Update(msg tea.Msg) (accountCreatorModel, tea.Cmd) 
 		}
 	}
 
-	currentInput := &m.inputs[m.stage]
 	for i := range m.inputs {
 		errMsg := m.validateInput(i)
 		m.inputs[i].previousInput = m.inputs[i].model.Value()
 		m.inputs[i].errorMsg = errMsg
 	}
+	currentInput := &m.inputs[m.stage]
 	currentInput.model, cmd = currentInput.model.Update(msg)
 
 	return m, cmd
 }
 
 func (m accountCreatorModel) View() string {
-	lastIndex := len(m.inputs) - 1
-	inputListStr := strings.Builder{}
-	errorsListStr := strings.Builder{}
-
-	for i, input := range m.inputs {
-		var render func(s ...string) string
-		if i == m.stage {
-			render = inputBoxSelectedStyle.Render
-		} else {
-			render = inputBoxStyle.Render
-		}
-
-		var mark string
-		if input.errorMsg == "" {
-			mark = successMessageStyle.Render("🗸\t")
-		} else {
-			mark = errorMessageStyle.Render("🞪\t")
-		}
-		label := mark + fmt.Sprintf("%-19s", input.label+": ")
-
-		inputListStr.WriteString(render(label) + input.model.View())
-
-		if errMsg := input.errorMsg; errMsg != "" {
-			errorsListStr.WriteString(errorMessageStyle.Render("- "+errMsg) + "\n")
-		}
-
-		if i != lastIndex {
-			inputListStr.WriteString("\n")
-		}
-	}
-
-	if errorsListStr.Len() > 0 {
-		return inputListStr.String() + "\n\n" + errorsListStr.String()
-	} else {
-		return inputListStr.String()
-	}
+	return standardTextInputView(m.stage, m.inputs, "")
 }
 
 func (m accountCreatorModel) switchAccount(msg fmt.Stringer) (accountCreatorModel, tea.Cmd) {
 	m.inputs[m.stage].model.Blur()
-
-	if msg.String() == "up" {
-		if m.stage > accountNewNameStage {
-			m.stage--
-		} else {
-			m.stage = accountNewInitialBalanceStage
-		}
-	} else {
-		if m.stage < accountNewInitialBalanceStage {
-			m.stage++
-		} else {
-			m.stage = accountNewNameStage
-		}
-	}
-
+	m.stage = handleSwitchInputStage(msg.String() == "up", m.stage, accountNewNameStage, accountNewInitialBalanceStage)
 	m.inputs[m.stage].model.SetCursor(0)
 	m.inputs[m.stage].model.Focus()
 
