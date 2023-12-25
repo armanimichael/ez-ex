@@ -12,6 +12,8 @@ User-data is saved into `~/.ez-ex/user-data.db` in a SQLite3 DB.
 
 `make build-cli` will compile the CLI application (then found inside `./out/ez-ex`).
 
+Run `ez-ex -help` for commands.
+
 ### Features
 
 - Manage account

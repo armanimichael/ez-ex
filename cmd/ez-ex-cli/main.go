@@ -2,21 +2,41 @@ package main
 
 import (
 	"database/sql"
+	"flag"
 	"fmt"
 	ezex "github.com/armanimichael/ez-ex"
+	customLogger "github.com/armanimichael/ez-ex/cmd/ez-ex-cli/logger"
 	tea "github.com/charmbracelet/bubbletea"
 	"log"
 	"os"
 )
 
-var logger = NewFileLogger()
+var logger customLogger.Logger
 
 func main() {
-	defer func(logger Logger) {
+	dbName := flag.String(
+		"db-name",
+		ezex.DefaultDBName,
+		"App DB filename (if not present, one will be created)",
+	)
+	logLevel := flag.Int(
+		"log-level",
+		5,
+		"Application log level (trace = 0, debug = 1, info = 2, warn = 3, error = 4, fatal = 5, none = 6)",
+	)
+	flag.Parse()
+
+	logger = customLogger.NewFileLogger(*logLevel)
+	defer func(logger customLogger.Logger) {
 		_ = logger.Close()
 	}(logger)
 
-	db, err := ezex.OpenDB()
+	var opts []ezex.OptionsBuilder
+	if *dbName != "" {
+		opts = append(opts, ezex.WithDBName(*dbName))
+	}
+
+	db, err := ezex.OpenDB(opts...)
 	if err != nil {
 		log.Fatalf("Error opening the DB: %s", err)
 	}
