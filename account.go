@@ -60,8 +60,8 @@ func UpdateAccountBalance(db *sql.DB, accountID int, amountInCents int64) (int, 
 		SET		balance_in_cents = balance_in_cents - $amount_in_cents
 		WHERE	id = $id
 		`,
-		accountID,
 		amountInCents,
+		accountID,
 	)
 }
 
