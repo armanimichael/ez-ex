@@ -1,30 +1,39 @@
-package main
+package logger
 
 import (
 	ezex "github.com/armanimichael/ez-ex"
-	"io"
 	"log"
 	"os"
 	"path"
 )
 
-type Logger interface {
-	io.Closer
-	Info(msg string)
-	Warn(msg string)
-	Err(msg string)
-	Debug(msg string)
-	Trace(msg string)
-	Fatal(msg string)
-}
-
+// FileLogger logs to ezex.UserDataDir/logs
 type FileLogger struct {
 	logger *log.Logger
+	level  int
 	file   *os.File
 	flag   int
 }
 
-func NewFileLogger() Logger {
+// NewFileLogger instantiates a new file logger
+// note: level must be between 0 (trace) and 6 (none)
+//
+//	0 = trace
+//	1 = debug
+//	2 = info
+//	3 = warn
+//	4 = err
+//	5 = fatal
+//	6 = none
+func NewFileLogger(level int) Logger {
+	if level > 6 || level < 0 {
+		panic("log level must be between 0 (trace) and 6 (none)")
+	}
+
+	if level == 6 {
+		return emptyLogger{}
+	}
+
 	home, _ := os.UserHomeDir()
 	logsFile, err := os.OpenFile(path.Join(home, ezex.UserDataDir, "logs"), os.O_RDWR|os.O_CREATE|os.O_APPEND, 0600)
 	if err != nil {
@@ -35,6 +44,7 @@ func NewFileLogger() Logger {
 
 	return FileLogger{
 		logger: log.New(logsFile, "", defaultFlag),
+		level:  level,
 		file:   logsFile,
 		flag:   defaultFlag,
 	}
@@ -45,27 +55,39 @@ func (f FileLogger) Close() error {
 }
 
 func (f FileLogger) Info(msg string) {
-	f.print("[INFO]", msg, f.flag)
+	if f.level <= infoLogLevel {
+		f.print("[INFO]", msg, f.flag)
+	}
 }
 
 func (f FileLogger) Warn(msg string) {
-	f.print("[WARNING]", msg, f.flag)
+	if f.level <= warnLogLevel {
+		f.print("[WARNING]", msg, f.flag)
+	}
 }
 
 func (f FileLogger) Err(msg string) {
-	f.print("[ERROR]", msg, f.flag)
+	if f.level <= errLogLevel {
+		f.print("[ERROR]", msg, f.flag)
+	}
 }
 
 func (f FileLogger) Debug(msg string) {
-	f.print("[DEBUG]", msg, f.flag|log.Llongfile)
+	if f.level <= debugLogLevel {
+		f.print("[DEBUG]", msg, f.flag|log.Llongfile)
+	}
 }
 
 func (f FileLogger) Trace(msg string) {
-	f.print("[TRACE]", msg, f.flag|log.Llongfile)
+	if f.level <= traceLogLevel {
+		f.print("[TRACE]", msg, f.flag|log.Llongfile)
+	}
 }
 
 func (f FileLogger) Fatal(msg string) {
-	f.print("[FATAL]", msg, f.flag)
+	if f.level <= fatalLogLevel {
+		f.print("[FATAL]", msg, f.flag)
+	}
 }
 
 func (f FileLogger) print(prefix string, msg string, flag int) {
