@@ -11,7 +11,6 @@ run-cli:
 build-mock:
 	@go build -o ${MOCK_SCRIPT_NAME} ./internal/datamock/
 	@echo 'Run `${MOCK_SCRIPT_NAME} -h` for more info'
-t:
 clean:
 	go clean
 	go mod tidy
