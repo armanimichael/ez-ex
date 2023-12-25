@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	ezex "github.com/armanimichael/ez-ex"
+	"github.com/armanimichael/ez-ex/cmd/ez-ex-cli/command"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"time"
@@ -73,7 +74,7 @@ func (m transactionCreatorModel) Update(msg tea.Msg) (transactionCreatorModel, t
 			notes := m.inputs[transactionNoteStage].model.Value()
 
 			// Create new transaction
-			return m, createNewTransactionCmd(
+			return m, command.CreateNewTransactionCmd(
 				m.db,
 				ezex.Transaction{
 					CategoryID:          m.suggestion.category.ID,

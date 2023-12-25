@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	ezex "github.com/armanimichael/ez-ex"
+	"github.com/armanimichael/ez-ex/cmd/ez-ex-cli/command"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -50,7 +51,7 @@ func (m accountCreatorModel) Update(msg tea.Msg) (accountCreatorModel, tea.Cmd) 
 			description := m.inputs[accountNewDescriptionStage].model.Value()
 			balance := decodeCents(m.inputs[accountNewInitialBalanceStage].model.Value())
 
-			return m, createNewAccountCmd(m.db, ezex.Account{
+			return m, command.CreateNewAccountCmd(m.db, ezex.Account{
 				Name: m.inputs[accountNewNameStage].model.Value(),
 				Description: sql.NullString{
 					String: description,

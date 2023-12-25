@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	ezex "github.com/armanimichael/ez-ex"
+	"github.com/armanimichael/ez-ex/cmd/ez-ex-cli/command"
 	"github.com/charmbracelet/bubbles/table"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
@@ -82,53 +83,53 @@ func (m transactionModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 
 	switch msg := msg.(type) {
-	case hideErrorMessageMsg:
-		if msg.message == m.err.msg && msg.id == m.err.id {
+	case command.HideErrorMessageMsg:
+		if msg.Message == m.err.msg && msg.ID == m.err.id {
 			m.err.msg = ""
 		}
-	case switchTransactionsMonthMsg:
-		month := msg.month
-		year := msg.year
-		transactions := msg.transactions
+	case command.SwitchTransactionsMonthMsg:
+		month := msg.Month
+		year := msg.Year
+		transactions := msg.Transactions
 
 		m.table.selectedMonth = month
 		m.table.selectedYear = year
 
 		if len(transactions) > 0 {
-			m.table.selectedID = msg.transactions[0].ID
+			m.table.selectedID = msg.Transactions[0].ID
 		}
 		m.table.model.SetCursor(0)
 
 		return m.createTransactionsTable(transactions), cmd
-	case createNewTransactionMsg:
-		if msg.err != nil {
-			logger.Fatal(fmt.Sprintf("Error creating new transaction: %v", msg.err))
-			m.err.msg = msg.err.Error()
+	case command.CreateNewTransactionMsg:
+		if msg.Err != nil {
+			logger.Fatal(fmt.Sprintf("Error creating new transaction: %v", msg.Err))
+			m.err.msg = msg.Err.Error()
 			m.err.id = time.Now().UnixMicro()
 
-			return m, hideErrorMessageCmd(m.err.id, m.err.msg)
+			return m, command.HideErrorMessageCmd(m.err.id, m.err.msg)
 		}
 
 		m.transactionCreator = m.transactionCreator.reset()
-		m.transactions = msg.transactions
-		m.account.BalanceInCents += msg.amountInCents
-		m.table.model.SetRows(transactionsToTableRows(msg.transactions...))
+		m.transactions = msg.Transactions
+		m.account.BalanceInCents += msg.AmountInCents
+		m.table.model.SetRows(transactionsToTableRows(msg.Transactions...))
 		m.stage = transactionSelectionStage
-		m.table.selectedID = msg.transactions[0].ID
+		m.table.selectedID = msg.Transactions[0].ID
 		m.table.model.SetCursor(0)
-	case deleteTransactionMsg:
-		if msg.err != nil {
-			logger.Fatal(fmt.Sprintf("Error deleting transaction: %v", msg.err))
-			m.err.msg = msg.err.Error()
+	case command.DeleteTransactionMsg:
+		if msg.Err != nil {
+			logger.Fatal(fmt.Sprintf("Error deleting transaction: %v", msg.Err))
+			m.err.msg = msg.Err.Error()
 			m.err.id = time.Now().UnixMicro()
 
-			return m, hideErrorMessageCmd(m.err.id, m.err.msg)
+			return m, command.HideErrorMessageCmd(m.err.id, m.err.msg)
 		}
 
 		// Remove deleted row from the table
 		updatedTransactions := make([]ezex.TransactionView, 0, len(m.transactions)-1)
 		for _, transaction := range m.transactions {
-			if transaction.ID != msg.deletedID {
+			if transaction.ID != msg.DeletedID {
 				updatedTransactions = append(updatedTransactions, transaction)
 			} else {
 				m.account.BalanceInCents -= transaction.AmountInCents
@@ -159,17 +160,17 @@ func (m transactionModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		case "esc":
 			logger.Debug("Go back to account list")
-			return m, switchModelCmd(accountModelID, 0)
+			return m, command.SwitchModelCmd(accountModelID, 0)
 		case "right":
 			next := m.table.selectedMonth + 1
 			logger.Debug(fmt.Sprintf("Switch to %v", time.Date(m.table.selectedYear, next, 0, 0, 0, 0, 0, time.Local).Format("January 2006")))
-			return m, tea.Batch(cmd, switchTransactionsMonthCmd(m.db, m.account.ID, m.table.selectedYear, m.table.selectedMonth+1))
+			return m, tea.Batch(cmd, command.SwitchTransactionsMonthCmd(m.db, m.account.ID, m.table.selectedYear, m.table.selectedMonth+1))
 		case "left":
 			prev := m.table.selectedMonth - 1
 			logger.Debug(fmt.Sprintf("Switch to %v", time.Date(m.table.selectedYear, prev, 0, 0, 0, 0, 0, time.Local).Format("January 2006")))
-			return m, tea.Batch(cmd, switchTransactionsMonthCmd(m.db, m.account.ID, m.table.selectedYear, prev))
+			return m, tea.Batch(cmd, command.SwitchTransactionsMonthCmd(m.db, m.account.ID, m.table.selectedYear, prev))
 		case "r":
-			return m, tea.Batch(cmd, switchTransactionsMonthCmd(m.db, m.account.ID, time.Now().Year(), time.Now().Month()))
+			return m, tea.Batch(cmd, command.SwitchTransactionsMonthCmd(m.db, m.account.ID, time.Now().Year(), time.Now().Month()))
 		case "d":
 			if len(m.transactions) == 0 {
 				break
@@ -178,7 +179,7 @@ func (m transactionModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			cursor := m.table.model.Cursor()
 			deletedTransaction := m.transactions[cursor]
 			return m, tea.Batch(
-				deleteTransactionCmd(
+				command.DeleteTransactionCmd(
 					m.db, deletedTransaction.AccountID,
 					deletedTransaction.ID,
 					deletedTransaction.AmountInCents,
