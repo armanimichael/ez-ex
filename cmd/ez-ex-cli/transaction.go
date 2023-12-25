@@ -14,13 +14,16 @@ import (
 
 type transactionModel struct {
 	db                 *sql.DB
-	errorMessage       string
 	newTransaction     ezex.Transaction
 	account            ezex.Account
 	transactions       []ezex.TransactionView
 	stage              int
 	transactionCreator transactionCreatorModel
-	table              struct {
+	err                struct {
+		id  int64
+		msg string
+	}
+	table struct {
 		model         table.Model
 		selectedID    int
 		selectedMonth time.Month
@@ -42,7 +45,6 @@ const (
 var transactionTableKeySuggestions = formatKeySuggestions([][]string{
 	{"^C", "quit"},
 	{"{esc}", "accounts list"},
-	{"{enter}", "select transaction"},
 	{"{right}", "next month"},
 	{"{left}", "previous month"},
 	{"r", "reset month"},
@@ -81,8 +83,8 @@ func (m transactionModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	switch msg := msg.(type) {
 	case hideErrorMessageMsg:
-		if msg.message == m.errorMessage {
-			m.errorMessage = ""
+		if msg.message == m.err.msg && msg.id == m.err.id {
+			m.err.msg = ""
 		}
 	case switchTransactionsMonthMsg:
 		month := msg.month
@@ -92,13 +94,19 @@ func (m transactionModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.table.selectedMonth = month
 		m.table.selectedYear = year
 
+		if len(transactions) > 0 {
+			m.table.selectedID = msg.transactions[0].ID
+		}
+		m.table.model.SetCursor(0)
+
 		return m.createTransactionsTable(transactions), cmd
 	case createNewTransactionMsg:
 		if msg.err != nil {
 			logger.Fatal(fmt.Sprintf("Error creating new transaction: %v", msg.err))
-			m.errorMessage = msg.err.Error()
+			m.err.msg = msg.err.Error()
+			m.err.id = time.Now().UnixMicro()
 
-			return m, hideErrorMessageCmd(m.errorMessage)
+			return m, hideErrorMessageCmd(m.err.id, m.err.msg)
 		}
 
 		m.transactionCreator = m.transactionCreator.reset()
@@ -111,9 +119,10 @@ func (m transactionModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case deleteTransactionMsg:
 		if msg.err != nil {
 			logger.Fatal(fmt.Sprintf("Error deleting transaction: %v", msg.err))
-			m.errorMessage = msg.err.Error()
+			m.err.msg = msg.err.Error()
+			m.err.id = time.Now().UnixMicro()
 
-			return m, hideErrorMessageCmd(m.errorMessage)
+			return m, hideErrorMessageCmd(m.err.id, m.err.msg)
 		}
 
 		// Remove deleted row from the table
@@ -149,12 +158,16 @@ func (m transactionModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "esc":
-			logger.Debug(fmt.Sprintf("Go back to account list"))
+			logger.Debug("Go back to account list")
 			return m, switchModelCmd(accountModelID, 0)
 		case "right":
+			next := m.table.selectedMonth + 1
+			logger.Debug(fmt.Sprintf("Switch to %v", time.Date(m.table.selectedYear, next, 0, 0, 0, 0, 0, time.Local).Format("January 2006")))
 			return m, tea.Batch(cmd, switchTransactionsMonthCmd(m.db, m.account.ID, m.table.selectedYear, m.table.selectedMonth+1))
 		case "left":
-			return m, tea.Batch(cmd, switchTransactionsMonthCmd(m.db, m.account.ID, m.table.selectedYear, m.table.selectedMonth-1))
+			prev := m.table.selectedMonth - 1
+			logger.Debug(fmt.Sprintf("Switch to %v", time.Date(m.table.selectedYear, prev, 0, 0, 0, 0, 0, time.Local).Format("January 2006")))
+			return m, tea.Batch(cmd, switchTransactionsMonthCmd(m.db, m.account.ID, m.table.selectedYear, prev))
 		case "r":
 			return m, tea.Batch(cmd, switchTransactionsMonthCmd(m.db, m.account.ID, time.Now().Year(), time.Now().Month()))
 		case "d":
@@ -162,14 +175,17 @@ func (m transactionModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				break
 			}
 
-			var selectedID int
-			if len(m.transactions) == 1 {
-				selectedID = m.transactions[0].ID
-			} else {
-				selectedID = m.table.selectedID
-			}
-
-			return m, tea.Batch(deleteTransactionCmd(m.db, selectedID, m.table.model.Cursor()), cmd)
+			cursor := m.table.model.Cursor()
+			deletedTransaction := m.transactions[cursor]
+			return m, tea.Batch(
+				deleteTransactionCmd(
+					m.db, deletedTransaction.AccountID,
+					deletedTransaction.ID,
+					deletedTransaction.AmountInCents,
+					cursor,
+				),
+				cmd,
+			)
 		case "n":
 			m.stage = transactionCreationStage
 			return m, textinput.Blink
@@ -201,8 +217,8 @@ func (m transactionModel) View() string {
 	str.WriteString(baseStyle.Render(m.table.model.View()) + "\n")
 	str.WriteString(transactionTableKeySuggestions)
 
-	if m.errorMessage != "" {
-		str.WriteString(errorMessageStyle.Render("Error: "+m.errorMessage) + "\n")
+	if m.err.msg != "" {
+		str.WriteString(errorMessageStyle.Render("Error: "+m.err.msg) + "\n")
 	}
 
 	return str.String()

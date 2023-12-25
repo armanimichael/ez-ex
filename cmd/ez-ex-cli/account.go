@@ -9,15 +9,19 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"strconv"
+	"time"
 )
 
 type accountModel struct {
 	db             *sql.DB
-	errorMessage   string
 	stage          int
 	accounts       []ezex.Account
 	accountCreator accountCreatorModel
-	table          struct {
+	err            struct {
+		id  int64
+		msg string
+	}
+	table struct {
 		model      table.Model
 		selectedID int
 	}
@@ -60,15 +64,16 @@ func (m accountModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	switch msg := msg.(type) {
 	case hideErrorMessageMsg:
-		if msg.message == m.errorMessage {
-			m.errorMessage = ""
+		if msg.message == m.err.msg && msg.id == m.err.id {
+			m.err.msg = ""
 		}
 	case deleteAccountMsg:
 		if msg.err != nil {
-			logger.Fatal(fmt.Sprintf("Error deleting account: %v", msg.err))
-			m.errorMessage = msg.err.Error()
+			logger.Err(fmt.Sprintf("Error deleting account: %v", msg.err))
+			m.err.msg = msg.err.Error()
+			m.err.id = time.Now().UnixMicro()
 
-			return m, hideErrorMessageCmd(m.errorMessage)
+			return m, hideErrorMessageCmd(m.err.id, m.err.msg)
 		}
 
 		logger.Debug(fmt.Sprintf("Delete account (ID: %v)", m.table.selectedID))
@@ -121,8 +126,8 @@ func (m accountModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m accountModel) View() string {
 	if m.stage == accountSelectionStage {
 		msg := ""
-		if m.errorMessage != "" {
-			msg = errorMessageStyle.Render("Error: "+m.errorMessage) + "\n"
+		if m.err.msg != "" {
+			msg = errorMessageStyle.Render("Error: "+m.err.msg) + "\n"
 		}
 
 		return baseStyle.Render(m.table.model.View()) + "\n" + accountTableKeySuggestions + "\n" + msg
@@ -171,8 +176,8 @@ func (m accountModel) handleAccountSelectionCommands(msg tea.Msg) (accountModel,
 		case "down", "up":
 			r := m.table.model.SelectedRow()
 			selectedID, _ := strconv.ParseInt(r[0], 10, 32)
-			m.errorMessage = ""
 			m.table.selectedID = int(selectedID)
+			m.err.msg = ""
 		}
 
 	}

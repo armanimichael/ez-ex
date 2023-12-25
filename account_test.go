@@ -50,9 +50,10 @@ func TestDeleteAccount(t *testing.T) {
 		InitialBalanceInCents: 0,
 		BalanceInCents:        0,
 	})
-	n := DeleteAccount(testDB, id)
+	n, err := DeleteAccount(testDB, id)
 
 	assert.Greater(t, n, 0)
+	assert.Nil(t, err)
 }
 
 func TestUpdateAccount(t *testing.T) {

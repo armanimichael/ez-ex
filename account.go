@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"time"
 )
 
 type Account struct {
@@ -29,8 +30,13 @@ func AddAccount(db *sql.DB, account Account) (int, error) {
 	)
 }
 
-func DeleteAccount(db *sql.DB, id int) int {
-	return dbDelete(db, `DELETE FROM accounts WHERE id = $id`, id)
+func DeleteAccount(db *sql.DB, id int) (int, error) {
+	return dbUpdate(
+		db,
+		`UPDATE accounts SET delete_date_unix = $date WHERE id = $id`,
+		time.Now().Unix(),
+		id,
+	)
 }
 
 func UpdateAccount(db *sql.DB, account Account) (int, error) {
@@ -66,7 +72,18 @@ func UpdateAccountBalance(db *sql.DB, accountID int, amountInCents int64) (int, 
 }
 
 func GetAccounts(db *sql.DB) []Account {
-	return dbGet[Account](db, `SELECT id, name, description, initial_balance_in_cents, balance_in_cents FROM accounts ORDER BY id DESC`)
+	return dbGet[Account](
+		db,
+		`
+		SELECT		id,
+					name,
+					description,
+					initial_balance_in_cents,
+					balance_in_cents
+		FROM 		accounts
+		WHERE		delete_date_unix IS NULL
+		ORDER BY 	id DESC`,
+	)
 }
 
 func GetAccount(db *sql.DB, id int) (Account, error) {

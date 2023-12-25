@@ -1,10 +1,11 @@
 CREATE TABLE IF NOT EXISTS accounts
 (
-    id                       INTEGER PRIMARY KEY,
-    name                     TEXT    NOT NULL UNIQUE,
-    description              TEXT,
-    initial_balance_in_cents INTEGER NOT NULL DEFAULT 0,
-    balance_in_cents         INTEGER NOT NULL DEFAULT 0
+    id                          INTEGER PRIMARY KEY,
+    name                        TEXT NOT NULL UNIQUE,
+    description                 TEXT,
+    initial_balance_in_cents    INTEGER NOT NULL DEFAULT 0,
+    balance_in_cents            INTEGER NOT NULL DEFAULT 0,
+    delete_date_unix            INTEGER
 );
 
 CREATE TABLE IF NOT EXISTS payees

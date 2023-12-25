@@ -2,7 +2,6 @@ package main
 
 import (
 	"database/sql"
-	"errors"
 	ezex "github.com/armanimichael/ez-ex"
 	tea "github.com/charmbracelet/bubbletea"
 	"time"
@@ -45,6 +44,7 @@ type deleteTransactionMsg = struct {
 }
 
 type hideErrorMessageMsg = struct {
+	id      int64
 	message string
 }
 
@@ -103,26 +103,29 @@ func createNewTransactionCmd(db *sql.DB, transaction ezex.Transaction, payee eze
 
 func deleteAccountCmd(db *sql.DB, id int, index int) tea.Cmd {
 	return func() tea.Msg {
-		n := ezex.DeleteAccount(db, id)
-
-		var err error
-		if n == 0 {
-			err = errors.New("cannot delete account with active transactions")
+		if _, err := ezex.DeleteAccount(db, id); err != nil {
+			return deleteTransactionMsg{
+				err: err,
+			}
 		}
 
 		return deleteAccountMsg{
 			deletedID:    id,
 			deletedIndex: index,
-			err:          err,
+			err:          nil,
 		}
 	}
 }
 
-func deleteTransactionCmd(db *sql.DB, id int, index int) tea.Cmd {
+func deleteTransactionCmd(db *sql.DB, accountID int, id int, amountInCents int64, index int) tea.Cmd {
 	return func() tea.Msg {
-		_, err := ezex.DeleteTransaction(db, id)
-		if err != nil {
+		var err error
+
+		if _, err = ezex.DeleteTransaction(db, id); err != nil {
 			return deleteTransactionMsg{err: err}
+		}
+		if _, err = ezex.UpdateAccountBalance(db, accountID, amountInCents); err != nil {
+			return createNewTransactionMsg{err: err}
 		}
 
 		return deleteTransactionMsg{
@@ -156,12 +159,11 @@ func switchTransactionsMonthCmd(db *sql.DB, accountID int, year int, month time.
 	}
 }
 
-func hideErrorMessageCmd(message string) tea.Cmd {
-	return func() tea.Msg {
-		time.Sleep(4 * time.Second)
-
+func hideErrorMessageCmd(id int64, message string) tea.Cmd {
+	return tea.Tick(4*time.Second, func(t time.Time) tea.Msg {
 		return hideErrorMessageMsg{
 			message: message,
+			id:      id,
 		}
-	}
+	})
 }
