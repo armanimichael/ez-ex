@@ -1,34 +1,47 @@
 # ez-ex
 
-Easy expenses tracker
+Easy expenses' tracker.
 
-## TODO
+Supports Linux system, not guaranteed to work with any other system.
+
+## User-data
+
+User-data is saved into `~/.ez-ex/user-data.db` in a SQLite3 DB.
+
+## CLI App
+
+`make build-cli` will compile the CLI application (then found inside `./out/ez-ex`).
 
 ### Features
 
 - Manage account
-  - [ ] CLI
-    - Manage updates
-    - Manage delete if there's any active transaction on given account
-  - [ ] Web
-- Manage payees
-    - [ ] CLI
+    - [x] CLI
+        - Create/Soft-Delete accounts
+        - View transactions
+        - Create/Soft-Delete transactions
+        - Upsert Categories / Payees during transaction creation
     - [ ] Web
-- Manage categories
-    - [ ] CLI
-    - [ ] Web
-- Manage transactions
-    - [ ] CLI
-    - [ ] Web
+    - [ ] Mobile App
+
+### Future ideas
+
+#### Any App type
+
 - [ ] Scheduled operations (transactions)
 - [ ] Language selection
 - [ ] Currency selection
+- [ ] Visualize soft-deleted records and hard-delete them if necessary
+- [ ] Create backups
+- Data Visualization (per time period or absolute)
+    - [ ] Earnings vs Expenses
+    - [ ] Trends
+    - [ ] Hot categories / payees
+- [ ] Include / Skip accounts in overviews
 
-### Maybe
+#### CLI
 
-- [ ] Manage soft-deleted transactions
+For now the CLI app is quite minimal, I may add more functionalities in the future.
 
-### Tech-debt
-
-- [ ] Make SQL struct map work with tags
-- [ ] Make SQL struct map work nested structs
+- [ ] Manage Categories and Payees
+- [ ] Update accounts
+- [ ] Update transactions
