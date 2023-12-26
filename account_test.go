@@ -110,7 +110,7 @@ func TestUpdateAccountBalance(t *testing.T) {
 
 	n, err := UpdateAccountBalance(testDB, id, -100)
 
-	assert.Equal(t, 0, n)
+	assert.Equal(t, 1, n)
 	assert.Nil(t, err)
 }
 
