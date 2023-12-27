@@ -74,7 +74,7 @@ func (ph *passwordHasher) WithSaltSize(size uint32) PasswordGenerator {
 
 // Hash hashes and salts the password
 func (ph *passwordHasher) Hash() HashEncoder {
-	ph.hash.b, ph.salt.b = HashPassword(ph.pwd, ph.salt.size, ph.hash.time, ph.hash.mem, ph.hash.cpus)
+	ph.hash.b, ph.salt.b = hashPassword(ph.pwd, ph.salt.size, ph.hash.time, ph.hash.mem, ph.hash.cpus)
 	return ph
 }
 
@@ -85,7 +85,7 @@ func (ph *passwordHasher) Bytes() (hash []byte, salt []byte) {
 
 // Verify checks if the hash is valid
 func (ph *passwordHasher) Verify(hash, salt []byte) bool {
-	return VerifyHash(ph.pwd, hash, salt, ph.hash.time, ph.hash.mem, ph.hash.cpus)
+	return verifyHash(ph.pwd, hash, salt, ph.hash.time, ph.hash.mem, ph.hash.cpus)
 }
 
 // Encode encodes the resulting hash into a string
